@@ -48,8 +48,9 @@ detect_env() {
         DISTRO="unknown"
     fi
     echo -e "${G}▸${N} Environment: ${B}$ENV_TYPE${N} / ${B}$DISTRO${N}"
-    $IS_CODESPACE && echo -e "${G}▸${N} GitHub Codespaces detected"
-    $IS_ROOT && echo -e "${Y}▸${N} Running as root"
+    [ "$IS_CODESPACE" = true ] && echo -e "${G}▸${N} GitHub Codespaces detected"
+    [ "$IS_ROOT" = true ] && echo -e "${Y}▸${N} Running as root" || true
+    return 0
 }
 
 # =============================================================================
