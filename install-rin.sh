@@ -24,6 +24,7 @@ banner() {
 }
 
 RIN_REPO="rinquickly/rin"
+RIN_SOURCE_REPO="${RIN_SOURCE_REPO:-rinquickly/rin-ai1780749809}"
 RIN_HOME="${RIN_HOME:-$HOME/.rin}"
 BIN_DIR="$RIN_HOME/bin"
 SRC_DIR="$RIN_HOME/src"
@@ -166,9 +167,13 @@ ensure_source() {
     else
         echo -e "${G}▸${N} Downloading Rin source..."
         mkdir -p "$RIN_HOME"
-        git clone --depth 1 --branch main "https://github.com/$RIN_REPO.git" "$SRC_DIR" 2>/dev/null || {
-            echo -e "${RED}✖ Failed to download Rin${N}"
-            exit 1
+        git clone --depth 1 --branch main "https://github.com/$RIN_SOURCE_REPO.git" "$SRC_DIR" 2>/dev/null || {
+            # Fallback: try the public repo URL
+            echo -e "${Y}▸${N} Private repo failed, trying public..."
+            git clone --depth 1 --branch main "https://github.com/$RIN_REPO.git" "$SRC_DIR" 2>/dev/null || {
+                echo -e "${RED}✖ Failed to download Rin${N}"
+                exit 1
+            }
         }
     fi
 
