@@ -109,15 +109,19 @@ download_binary() {
     mkdir -p /tmp/rin-upgrade
     tar -xzf /tmp/rin-upgrade.tar.gz -C /tmp/rin-upgrade 2>/dev/null
 
-    # Find the binary inside the tar
+    # Find the binary inside the tar — exactly one executable named rin
     local binary
-    binary=$(find /tmp/rin-upgrade -type f -name "rin*" -o -type f -executable 2>/dev/null | head -1)
-    if [ -n "$binary" ]; then
+    binary=$(find /tmp/rin-upgrade -type f -name "rin" 2>/dev/null | head -1)
+    if [ -z "$binary" ]; then
+        binary=$(find /tmp/rin-upgrade -type f -executable 2>/dev/null | head -1)
+    fi
+    if [ -n "$binary" ] && file "$binary" | grep -qi "ELF\|executable\|Mach-O\|PE32"; then
         cp "$binary" "$BIN_DIR/rin"
+        chmod +x "$BIN_DIR/rin"
     else
-        # Maybe the tar has the binary at root
-        cp /tmp/rin-upgrade.tar.gz /dev/null 2>/dev/null
-        echo -e "${RED}✖ No binary found in archive${N}"
+        echo -e "${RED}✖ No valid binary found in archive${N}"
+        echo -e "${Y}▸${N} Archive contents:"
+        tar -tzf /tmp/rin-upgrade.tar.gz 2>/dev/null | head -10
         rm -rf /tmp/rin-upgrade /tmp/rin-upgrade.tar.gz
         exit 1
     fi
@@ -135,26 +139,35 @@ download_binary() {
 # Setup proxy rotation
 # =============================================================================
 setup_proxies() {
-    local proxy_script="$RIN_HOME/rin-proxy.sh"
-    if [ ! -f "$proxy_script" ]; then
-        echo -e "${G}▸${N} Downloading proxy rotator..."
-        curl -sf "https://raw.githubusercontent.com/$RIN_REPO/main/script/rin-proxy.sh" \
-          -o "$proxy_script" 2>/dev/null && chmod +x "$proxy_script"
-    fi
-
-    # Auto-fetch proxies into RIN_PROXIES
-    if [ -f "$proxy_script" ]; then
-        echo -e "${G}▸${N} Fetching 500+ free proxies..."
+    if command -v "$BIN_DIR/rin" &>/dev/null; then
+        echo -e "${G}▸${N} Fetching proxies via 'rin proxy fetch'..."
+        "$BIN_DIR/rin" proxy fetch 200 2>/dev/null || true
         local proxies
-        proxies=$(bash "$proxy_script" 2>/dev/null | head -100 | paste -sd ",")
-        local count
-        count=$(echo "$proxies" | tr ',' '\n' | wc -l)
-        if [ "$count" -gt 0 ]; then
+        proxies=$(grep -oP 'RIN_PROXITES=\K.*' "$RIN_HOME/proxies.txt" 2>/dev/null || echo "")
+        if [ -n "$proxies" ]; then
+            local count
+            count=$(echo "$proxies" | tr ',' '\n' | wc -l)
             echo -e "${G}✓${N} $count proxies loaded (auto-rotate on rate limit)"
-            echo -e "${Y}▸${N} Set RIN_PROXIES to persist across sessions:"
-            echo -e "    ${B}export RIN_PROXIES=\"$proxies\"${N}"
-            # Set for current session
             export RIN_PROXIES="$proxies"
+        fi
+    else
+        local proxy_script="$RIN_HOME/rin-proxy.sh"
+        if [ ! -f "$proxy_script" ]; then
+            echo -e "${G}▸${N} Downloading proxy rotator..."
+            curl -sf "https://raw.githubusercontent.com/$RIN_REPO/main/script/rin-proxy.sh" \
+              -o "$proxy_script" 2>/dev/null && chmod +x "$proxy_script"
+        fi
+        if [ -f "$proxy_script" ]; then
+            echo -e "${G}▸${N} Fetching 500+ free proxies..."
+            local p
+            p=$(bash "$proxy_script" 2>/dev/null | head -100 | paste -sd ",")
+            local c
+            c=$(echo "$p" | tr ',' '\n' | wc -l)
+            if [ "$c" -gt 0 ]; then
+                echo -e "${G}✓${N} $c proxies loaded"
+                echo -e "${Y}▸${N} Persist: export RIN_PROXIES=\"$p\""
+                export RIN_PROXIES="$p"
+            fi
         fi
     fi
 }

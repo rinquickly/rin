@@ -223,7 +223,7 @@ create_launcher() {
         cd "$SRC_DIR/packages/opencode"
         if bun run script/build.ts --single --skip-embed-web-ui 2>&1 | tail -3; then
             local built_bin
-            built_bin=$(find "$SRC_DIR/packages/opencode/dist" -name "opencode" -type f 2>/dev/null | head -1)
+            built_bin=$(find "$SRC_DIR/packages/opencode/dist" -name "rin" -type f 2>/dev/null | head -1)
             if [ -n "$built_bin" ]; then
                 cp "$built_bin" "$BIN_DIR/rin"
                 chmod +x "$BIN_DIR/rin"
@@ -244,35 +244,34 @@ DIR="$(cd "$(dirname "$SCRIPT")/.." && pwd)"
 export PATH="$HOME/.bun/bin:$PATH"
 
 # ===== RIN UNLIMITED MODE =====
-export OPENCODE_TIMEOUT=false
-export OPENCODE_HEADER_TIMEOUT=false
-export OPENCODE_CHUNK_TIMEOUT=999999999
-export OPENCODE_CONTEXT_LIMIT=999999999
-export OPENCODE_INPUT_LIMIT=999999999
-export OPENCODE_OUTPUT_LIMIT=999999999
-export OPENCODE_STEPS=999999999
-export OPENCODE_COMPACTION_AUTO=false
-export OPENCODE_COMPACTION_PRUNE=false
-export OPENCODE_TOOL_OUTPUT_MAX_LINES=999999999
-export OPENCODE_TOOL_OUTPUT_MAX_BYTES=999999999
+export RIN_TIMEOUT=false
+export RIN_HEADER_TIMEOUT=false
+export RIN_CHUNK_TIMEOUT=999999999
+export RIN_CONTEXT_LIMIT=999999999
+export RIN_INPUT_LIMIT=999999999
+export RIN_OUTPUT_LIMIT=999999999
+export RIN_STEPS=999999999
+export RIN_COMPACTION_AUTO=false
+export RIN_COMPACTION_PRUNE=false
+export RIN_TOOL_OUTPUT_MAX_LINES=999999999
+export RIN_TOOL_OUTPUT_MAX_BYTES=999999999
 
 # ===== AUTO PROXY ROTATION =====
 if [ -z "$RIN_PROXIES" ]; then
-    if [ -f "$DIR/rin-proxy.sh" ]; then
-        echo "⟳ Rin: Fetching 500+ rotating proxies..." >&2
-        RIN_PROXIES=$(bash "$DIR/rin-proxy.sh" 2>/dev/null | paste -sd ",")
-        COUNT=$(echo "$RIN_PROXIES" | tr ',' '\n' | wc -l)
-        echo "✓ Rin: $COUNT proxies loaded (auto-rotate on limit)" >&2
-        export RIN_PROXIES
-    elif command -v curl &>/dev/null; then
-        echo "⟳ Rin: Fetching proxies from ProxyScrape..." >&2
-        RIN_PROXIES=$(curl -sf "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text&protocol=http&timeout=10000" 2>/dev/null | head -100 | paste -sd ",")
-        COUNT=$(echo "$RIN_PROXIES" | tr ',' '\n' | wc -l)
-        if [ "$COUNT" -gt 0 ]; then
-            echo "✓ Rin: $COUNT proxies loaded" >&2
-            export RIN_PROXIES
-        fi
+    if command -v "$DIR/rin" &>/dev/null || command -v rin &>/dev/null; then
+        echo "⟳ Rin: Fetching proxies (rin proxy fetch)..." >&2
+        RIN_PROXIES=$("$DIR/rin" proxy fetch 200 2>/dev/null | tail -1 | grep -oP 'RIN_PROXIES=\K.*' || true)
     fi
+    if [ -z "$RIN_PROXIES" ] && [ -f "$DIR/rin-proxy.sh" ]; then
+        echo "⟳ Rin: Fetching proxies (fallback)..." >&2
+        RIN_PROXIES=$(bash "$DIR/rin-proxy.sh" 2>/dev/null | paste -sd ",")
+    fi
+    if [ -z "$RIN_PROXIES" ] && command -v curl &>/dev/null; then
+        echo "⟳ Rin: Fetching proxies (direct)..." >&2
+        RIN_PROXIES=$(curl -sf "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text&protocol=http&timeout=10000" 2>/dev/null | head -100 | paste -sd ",")
+    fi
+    COUNT=$(echo "$RIN_PROXIES" | tr ',' '\n' | wc -l)
+    [ "$COUNT" -gt 0 ] && echo "✓ Rin: $COUNT proxies loaded" >&2 && export RIN_PROXIES
 fi
 
 cd "$DIR/src"
